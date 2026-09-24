@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vienna Region Outdoor Scores</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .last-updated { font-size: 0.9em; color: #777; margin-top: 5px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; max-width: 1000px; margin: 0 auto; }
+        .card { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 4px solid #0078D4; }
+        .card h2 { margin: 0 0 15px 0; display: flex; justify-content: space-between; align-items: center; }
+        .rank { background: #0078D4; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.75em; }
+        .metric { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
+        .metric:last-child { border-bottom: none; }
+        .score-high { color: #2e7d32; font-weight: bold; }
+        .score-med { color: #f57c00; font-weight: bold; }
+        .score-low { color: #c62828; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Destination Outdoor Scores</h1>
+        <div class="last-updated" id="updated-time">Fetching latest data...</div>
+    </div>
+    <div class="grid" id="weather-grid"></div>
+
+    <script>
+        async function loadData() {
+            try {
+                // Fetch the static JSON file
+                const response = await fetch('data/weather_summary.json');
+                const text = await response.text();
+                
+                // Parse PySpark's newline-delimited JSON
+                const rawRows = text.trim().split('\n');
+                const data = rawRows.map(row => JSON.parse(row));
+
+                const grid = document.getElementById('weather-grid');
+                let latestUpdate = "Unknown";
+
+                data.forEach(item => {
+                    latestUpdate = item.processed_at || latestUpdate;
+                    
+                    let scoreClass = 'score-low';
+                    if(item.outdoor_score >= 70) scoreClass = 'score-high';
+                    else if(item.outdoor_score >= 40) scoreClass = 'score-med';
+
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.innerHTML = `
+                        <h2>${item.location} <span class="rank">Rank #${item.daily_rank}</span></h2>
+                        <div class="metric"><span>Date:</span> <strong>${item.forecast_date}</strong></div>
+                        <div class="metric"><span>Condition:</span> <strong>${item.weather_condition}</strong></div>
+                        <div class="metric"><span>Temperature:</span> <strong>${item.temp_min_c}°C - ${item.temp_max_c}°C</strong></div>
+                        <div class="metric"><span>Rain Chance:</span> <strong>${item.max_precipitation_probability_pct}%</strong></div>
+                        <div class="metric"><span>Outdoor Score:</span> <strong class="${scoreClass}">${item.outdoor_score}/100</strong></div>
+                    `;
+                    grid.appendChild(card);
+                });
+
+                const dateObj = new Date(latestUpdate + "Z"); // Append Z to enforce UTC parsing
+                document.getElementById('updated-time').innerText = `Last updated: ${dateObj.toLocaleString()}`;
+
+            } catch (error) {
+                console.error("Error loading data:", error);
+                document.getElementById('updated-time').innerText = "Error loading data. Check console.";
+            }
+        }
+        loadData();
+    </script>
+</body>
+</html>
