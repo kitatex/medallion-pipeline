@@ -1,0 +1,12 @@
+[project]
+name = "medallion-pipeline"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "azure-identity>=1.25.3",
+    "azure-storage-file-datalake>=12.25.0",
+    "pandas>=3.0.6",
+    "requests>=2.34.2",
+]
