@@ -18,20 +18,17 @@ silver_path = (
 )
 
 # Bronze
-
 raw_df = spark.read.json(raw_path)
 
-raw_df.write.format("delta").mode("overwrite").save(bronze_path)
-
+(raw_df.write.format("delta").mode("overwrite").save(bronze_path))
 
 # Silver
-
 bronze_df = spark.read.format("delta").load(bronze_path)
 
 hourly_df = bronze_df.select(
-    "name",
     "latitude",
     "longitude",
+    "timezone",
     F.explode(
         F.arrays_zip(
             "hourly.time",
@@ -49,9 +46,9 @@ hourly_df = bronze_df.select(
         )
     ).alias("weather"),
 ).select(
-    "name",
     "latitude",
     "longitude",
+    "timezone",
     F.col("weather.0").alias("timestamp"),
     F.col("weather.1").alias("temperature_c"),
     F.col("weather.2").alias("apparent_temperature_c"),
@@ -66,4 +63,4 @@ hourly_df = bronze_df.select(
     F.col("weather.11").alias("uv_index"),
 )
 
-hourly_df.write.format("delta").mode("overwrite").save(silver_path)
+(hourly_df.write.format("delta").mode("overwrite").save(silver_path))
