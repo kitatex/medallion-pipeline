@@ -26,9 +26,10 @@ raw_df = spark.read.json(raw_path)
 bronze_df = spark.read.format("delta").load(bronze_path)
 
 hourly_df = bronze_df.select(
-    "latitude",
-    "longitude",
-    "timezone",
+    F.col("destination.name").alias("location"),
+    F.col("destination.latitude").alias("latitude"),
+    F.col("destination.longitude").alias("longitude"),
+    F.col("timezone").alias("timezone"),
     F.explode(
         F.arrays_zip(
             "hourly.time",
