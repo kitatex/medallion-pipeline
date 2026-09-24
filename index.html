@@ -6,8 +6,10 @@
     <title>Vienna Region Outdoor Scores</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; }
-        .header { text-align: center; margin-bottom: 30px; }
+        .header { text-align: center; margin-bottom: 20px; }
         .last-updated { font-size: 0.9em; color: #777; margin-top: 5px; }
+        .controls { text-align: center; margin-bottom: 30px; }
+        select { padding: 8px 12px; font-size: 1em; border-radius: 4px; border: 1px solid #ccc; cursor: pointer; }
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; max-width: 1000px; margin: 0 auto; }
         .card { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 4px solid #0078D4; }
         .card h2 { margin: 0 0 15px 0; display: flex; justify-content: space-between; align-items: center; }
@@ -24,50 +26,90 @@
         <h1>Destination Outdoor Scores</h1>
         <div class="last-updated" id="updated-time">Fetching latest data...</div>
     </div>
+    
+    <div class="controls">
+        <label for="date-filter"><strong>Select Forecast Date:</strong> </label>
+        <select id="date-filter"></select>
+    </div>
+
     <div class="grid" id="weather-grid"></div>
 
     <script>
+        let globalData = [];
+
         async function loadData() {
             try {
-                // Fetch the static JSON file
                 const response = await fetch('data/weather_summary.json');
+                if (!response.ok) throw new Error("Data file not found.");
+                
                 const text = await response.text();
                 
                 // Parse PySpark's newline-delimited JSON
                 const rawRows = text.trim().split('\n');
-                const data = rawRows.map(row => JSON.parse(row));
+                globalData = rawRows.map(row => JSON.parse(row));
 
-                const grid = document.getElementById('weather-grid');
-                let latestUpdate = "Unknown";
+                // Handle the timestamp safely
+                let latestUpdate = globalData[0]?.processed_at;
+                if (latestUpdate) {
+                    const dateObj = new Date(latestUpdate); // Removed the manual "Z" append
+                    if (!isNaN(dateObj)) {
+                        document.getElementById('updated-time').innerText = `Last updated: ${dateObj.toLocaleString()}`;
+                    } else {
+                        document.getElementById('updated-time').innerText = "Last updated: Timestamp format error";
+                    }
+                }
 
-                data.forEach(item => {
-                    latestUpdate = item.processed_at || latestUpdate;
-                    
-                    let scoreClass = 'score-low';
-                    if(item.outdoor_score >= 70) scoreClass = 'score-high';
-                    else if(item.outdoor_score >= 40) scoreClass = 'score-med';
-
-                    const card = document.createElement('div');
-                    card.className = 'card';
-                    card.innerHTML = `
-                        <h2>${item.location} <span class="rank">Rank #${item.daily_rank}</span></h2>
-                        <div class="metric"><span>Date:</span> <strong>${item.forecast_date}</strong></div>
-                        <div class="metric"><span>Condition:</span> <strong>${item.weather_condition}</strong></div>
-                        <div class="metric"><span>Temperature:</span> <strong>${item.temp_min_c}°C - ${item.temp_max_c}°C</strong></div>
-                        <div class="metric"><span>Rain Chance:</span> <strong>${item.max_precipitation_probability_pct}%</strong></div>
-                        <div class="metric"><span>Outdoor Score:</span> <strong class="${scoreClass}">${item.outdoor_score}/100</strong></div>
-                    `;
-                    grid.appendChild(card);
+                // Extract unique dates and populate the dropdown
+                const dates = [...new Set(globalData.map(item => item.forecast_date))].sort();
+                const select = document.getElementById('date-filter');
+                
+                dates.forEach(d => {
+                    const option = document.createElement('option');
+                    option.value = d;
+                    option.text = d;
+                    select.appendChild(option);
                 });
 
-                const dateObj = new Date(latestUpdate + "Z"); // Append Z to enforce UTC parsing
-                document.getElementById('updated-time').innerText = `Last updated: ${dateObj.toLocaleString()}`;
+                // Render the first day by default
+                if (dates.length > 0) {
+                    renderGrid(dates[0]);
+                }
+
+                // Add event listener to re-render when dropdown changes
+                select.addEventListener('change', (e) => {
+                    renderGrid(e.target.value);
+                });
 
             } catch (error) {
                 console.error("Error loading data:", error);
                 document.getElementById('updated-time').innerText = "Error loading data. Check console.";
             }
         }
+
+        function renderGrid(selectedDate) {
+            const grid = document.getElementById('weather-grid');
+            grid.innerHTML = ''; // Clear existing cards
+
+            const filteredData = globalData.filter(item => item.forecast_date === selectedDate);
+
+            filteredData.forEach(item => {
+                let scoreClass = 'score-low';
+                if(item.outdoor_score >= 70) scoreClass = 'score-high';
+                else if(item.outdoor_score >= 40) scoreClass = 'score-med';
+
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <h2>${item.location} <span class="rank">Rank #${item.daily_rank}</span></h2>
+                    <div class="metric"><span>Condition:</span> <strong>${item.weather_condition}</strong></div>
+                    <div class="metric"><span>Temperature:</span> <strong>${item.temp_min_c}°C - ${item.temp_max_c}°C</strong></div>
+                    <div class="metric"><span>Rain Chance:</span> <strong>${item.max_precipitation_probability_pct}%</strong></div>
+                    <div class="metric"><span>Outdoor Score:</span> <strong class="${scoreClass}">${item.outdoor_score}/100</strong></div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
         loadData();
     </script>
 </body>
