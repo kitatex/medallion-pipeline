@@ -2,9 +2,12 @@ name: Fetch Pipeline Data
 
 on:
     schedule:
-        # Runs at 05:15 UTC daily (15 minutes after Databricks starts)
         - cron: "15 05 * * *"
-    workflow_dispatch: # Allows you to trigger it manually from the UI
+    workflow_dispatch:
+
+# This block grants the Action permission to push the commit, fixing the 128 error
+permissions:
+    contents: write
 
 jobs:
     fetch-and-commit:
@@ -20,7 +23,7 @@ jobs:
                   mkdir -p temp_data
                   mkdir -p data
 
-                  # Download the entire gold export directory contents
+                  # Download the files
                   az storage blob download-batch \
                     --account-name learning11778653 \
                     --source weather-data \
@@ -28,17 +31,21 @@ jobs:
                     --pattern "gold/export_daily_summary/*.json" \
                     --connection-string "$AZURE_CONNECTION_STRING"
 
-                  # Find Spark's dynamically named part-0000.json and rename it to a static name
+                  # Debugging line: list downloaded files in the Action logs
+                  echo "Downloaded files:"
+                  ls -R temp_data
+
+                  # Find the Spark JSON file and rename it to a static name
                   find temp_data -name "*.json" -exec cp {} data/weather_summary.json \;
 
-                  # Clean up the messy Spark folder structure
+                  # Clean up
                   rm -rf temp_data
 
             - name: Commit and Push Changes
               run: |
                   git config --global user.name "github-actions[bot]"
                   git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
                   git add data/weather_summary.json
-                  # Only commit if there are actual changes to the data
                   git commit -m "Automated data sync from ADLS" || echo "No data changes to commit"
                   git push
